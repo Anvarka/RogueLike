@@ -7,7 +7,10 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.runBlocking
 
-class Client(private val user: String, private val screen: TerminalScreen, private val client: HttpClient) {
+class Client(private val user: String,
+             private val screen: TerminalScreen,
+             private val client: HttpClient,
+             private val server: String) {
     private var map: Map
 
     init {
@@ -38,7 +41,7 @@ class Client(private val user: String, private val screen: TerminalScreen, priva
 
     private fun connect() {
         runBlocking {
-            client.post<Unit>("http://localhost:5000/connect") {
+            client.post<Unit>("$server/connect") {
                 header("Content-Type", "application/json")
                 body = UserId(user)
             }
@@ -47,7 +50,7 @@ class Client(private val user: String, private val screen: TerminalScreen, priva
 
     private fun getMapInit(): Map {
         return runBlocking {
-            client.get("http://localhost:5000/map") {
+            client.get("$server/map") {
                 header("Content-Type", "application/json")
                 body = UserId(user)
             }
@@ -56,7 +59,7 @@ class Client(private val user: String, private val screen: TerminalScreen, priva
 
     private fun move(dir: Direction): Map {
         return runBlocking {
-            client.post("http://localhost:5000/move") {
+            client.post("$server/move") {
                 header("Content-Type", "application/json")
                 body = MoveRequest(user, dir)
             }
@@ -65,14 +68,19 @@ class Client(private val user: String, private val screen: TerminalScreen, priva
 }
 
 fun main(args: Array<String>) {
+    if (args.size != 2) {
+        System.err.println("usage: ./gradlew run --args=\"NICKNAME SERVER\"")
+        return
+    }
     val user = args[0]
+    val server = args[1]
     val terminalFactory = DefaultTerminalFactory()
     terminalFactory.createTerminal().use { term ->
         val screen = TerminalScreen(term)
         screen.startScreen()
         screen.cursorPosition = null
         HttpClient(CIO){ install(JsonFeature) }.use { httpClient ->
-            val client = Client(user, screen, httpClient)
+            val client = Client(user, screen, httpClient, server)
             client.gameLoop()
         }
     }
