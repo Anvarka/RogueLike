@@ -65,7 +65,7 @@ def player_move(request):
         return HttpResponse("Error")
     x = new_pos[0]
     y = new_pos[1]
-    walls = literal_eval(user_info.walls)
+    walls = user_info.walls
     stairs = user_info.stairs
 
     if x > 19 or y > 19 or x < 0 or y < 0 or (new_pos in walls):
@@ -80,7 +80,8 @@ def player_move(request):
     user_info.player = new_pos
     response_message = {
         "walls": user_info.walls,
-        "player": user_info.player
+        "player": user_info.player,
+        "stairs": user_info.stairs
     }
     user_info.save()
 
@@ -97,9 +98,7 @@ def connect(request):
     user_id = request_message["user_id"]
 
     if is_user_new(user_id):
-        print(user_id)
         walls, stairs = generate_map()
-        print("dffsf")
         models.User.objects.create(user_id=user_id, walls=walls, stairs=stairs, player=[0, 0])
         return HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")
     else:
@@ -138,4 +137,4 @@ def generate_map():
         x = random.randint(1, 19)
         y = random.randint(1, 19)
     stairs = [x, y]
-    return f"{walls}", stairs
+    return walls, stairs

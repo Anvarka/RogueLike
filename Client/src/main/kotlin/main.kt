@@ -41,7 +41,7 @@ class Client(private val user: String,
 
     private fun connect() {
         runBlocking {
-            client.post<Unit>("$server/connect") {
+            client.post<Unit>("$server/server/connect/") {
                 header("Content-Type", "application/json")
                 body = UserId(user)
             }
@@ -50,7 +50,7 @@ class Client(private val user: String,
 
     private fun getMapInit(): Map {
         return runBlocking {
-            client.get("$server/map") {
+            client.post("$server/server/map/") {
                 header("Content-Type", "application/json")
                 body = UserId(user)
             }
@@ -59,7 +59,7 @@ class Client(private val user: String,
 
     private fun move(dir: Direction): Map {
         return runBlocking {
-            client.post("$server/move") {
+            client.post("$server/server/move/") {
                 header("Content-Type", "application/json")
                 body = MoveRequest(user, dir)
             }

@@ -6,12 +6,13 @@ import kotlinx.serialization.Serializable
 // Types for serialization
 
 @Serializable
-data class Map(val walls: List<List<Int>>, val player: List<Int>) {
+data class Map(val walls: List<List<Int>>, val player: List<Int>, val stairs: List<Int>) {
     fun draw(screen: TerminalScreen) {
         screen.clear()
         for (wall in walls) {
             screen.setCharacter(wall[0], wall[1], TextCharacter.fromCharacter('#')[0])
         }
+        screen.setCharacter(stairs[0], stairs[1], TextCharacter.fromCharacter('>')[0])
         screen.setCharacter(player[0], player[1], TextCharacter.fromCharacter('@')[0])
         screen.refresh()
     }
