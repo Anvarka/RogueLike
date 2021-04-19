@@ -1,6 +1,8 @@
 import com.googlecode.lanterna.input.KeyType
 import com.googlecode.lanterna.screen.TerminalScreen
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
+import com.googlecode.lanterna.terminal.swing.SwingTerminalFontConfiguration
+import com.googlecode.lanterna.TerminalSize
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.features.json.*
@@ -74,7 +76,10 @@ fun main(args: Array<String>) {
     }
     val user = args[0]
     val server = args[1]
+    val fontConfig = SwingTerminalFontConfiguration.getDefaultOfSize(25)
     val terminalFactory = DefaultTerminalFactory()
+        .setInitialTerminalSize(TerminalSize(20, 20))
+        .setTerminalEmulatorFontConfiguration(fontConfig)
     terminalFactory.createTerminal().use { term ->
         val screen = TerminalScreen(term)
         screen.startScreen()
