@@ -37,8 +37,16 @@
 
 Use-case диаграмма:
 
-![](https://github.com/Anvarka/RogueLike/blob/main/useCase.png)
+![](https://github.com/Anvarka/RogueLike/blob/Design-document/useCaseDiagram.png)
 
 Диаграмма компонентов:
 
-![](https://github.com/Anvarka/RogueLike/blob/main/components.png)
+![](https://github.com/Anvarka/RogueLike/blob/Design-document/componentsDiagram.png)
+
+Мы отделили диаграмму классов:
+
+![](https://github.com/Anvarka/RogueLike/blob/Design-document/DiagramClass.png)
+
+Распределение компонентов между участниками команды:
+
+Дима реализовывал клиентскую часть(Kotlin), Анвар реализовывал серверную часть(Django-Python).
