@@ -5,7 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse, JsonResponse
 from enum import Enum
 from server import models
-from ast import literal_eval
+from server.characters import AggressiveEnemy, Player
 
 
 class Move(Enum):
@@ -13,13 +13,6 @@ class Move(Enum):
     down = "down"
     left = "left"
     right = "right"
-
-
-class UserEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, models.User):
-            return obj.__dict__
-        return json.JSONEncoder.default(self, obj)
 
 
 @api_view(['POST'])
@@ -35,7 +28,8 @@ def get_map(request):
     response_message = {
         "walls": user_info.walls,
         "stairs": user_info.stairs,
-        "player": user_info.player
+        "player": user_info.player.encode_for_client(),
+        "agr_enemies": [en.encode_for_client() for en in user_info.agr_enemies]
     }
     return JsonResponse(response_message, safe=False)
 
@@ -50,8 +44,8 @@ def player_move(request):
     direction = request_message["direction"]
     user_info = models.User.objects.get(user_id=user_id)
     player = user_info.player
-    cur_x = player[0]
-    cur_y = player[1]
+    cur_x = player.cur_pos[0]
+    cur_y = player.cur_pos[1]
 
     if direction == Move.up.name:
         new_pos = [cur_x, cur_y - 1]
@@ -72,16 +66,23 @@ def player_move(request):
         new_pos = [cur_x, cur_y]
 
     if new_pos == stairs:
-        walls, stairs = generate_map()
+        walls, stairs, agr_enemies = generate_map()
         user_info.walls = walls
         user_info.stairs = stairs
+        user_info.agr_enemies = agr_enemies
+
         new_pos = [0, 0]
 
-    user_info.player = new_pos
+    user_info.player.cur_pos = new_pos
+
+    for enemy in user_info.agr_enemies:
+        enemy.move(enemy.get_next_move(user_info), user_info)
+
     response_message = {
         "walls": user_info.walls,
-        "player": user_info.player,
-        "stairs": user_info.stairs
+        "player": user_info.player.encode_for_client(),
+        "stairs": user_info.stairs,
+        "agr_enemies": [en.encode_for_client() for en in user_info.agr_enemies]
     }
     user_info.save()
 
@@ -98,8 +99,8 @@ def connect(request):
     user_id = request_message["user_id"]
 
     if is_user_new(user_id):
-        walls, stairs = generate_map()
-        models.User.objects.create(user_id=user_id, walls=walls, stairs=stairs, player=[0, 0])
+        walls, stairs, agr_enemies = generate_map()
+        models.User.objects.create(user_id=user_id, walls=walls, stairs=stairs, player=Player(0, 0), agr_enemies=agr_enemies)
         return HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")
     else:
         return HttpResponse(f"Вы уже были зарегистрированы, {user_id}")
@@ -123,18 +124,31 @@ def generate_map():
     """
 
     walls = []
+    agr_enemies = []
+    taken = []
     is_start = True
     x = -1
     y = -1
     for i in range(16):
-        while is_start or ([x, y] in walls):
+        while is_start or ([x, y] in taken):
             x = random.randint(1, 19)
             y = random.randint(1, 19)
             is_start = False
         walls.append([x, y])
+        taken.append([x, y])
 
-    while [x, y] in walls:
+    for i in range(3):
+        x = random.randint(1, 19)
+        y = random.randint(1, 19)
+        while [x, y] in taken:
+            x = random.randint(1, 19)
+            y = random.randint(1, 19)
+        agr_enemies.append(AggressiveEnemy(x, y))
+        taken.append([x, y])
+
+    while [x, y] in taken:
         x = random.randint(1, 19)
         y = random.randint(1, 19)
     stairs = [x, y]
-    return walls, stairs
+
+    return walls, stairs, agr_enemies
