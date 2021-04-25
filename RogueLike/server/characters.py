@@ -4,6 +4,57 @@ from typing import Any
 import json
 
 
+def plot_line_low(x0, y0, x1, y1):
+    dx = x1 - x0
+    dy = y1 - y0
+    yi = 1
+    if dy < 0:
+        yi = -1
+        dy = -dy
+    d = (2 * dy) - dx
+    y = y0
+    line = []
+    for x in range(x0, x1 + 1):
+        line.append([x, y])
+        if d > 0:
+            y = y + yi
+            d = d + (2 * (dy - dx))
+        else:
+            d = d + 2*dy
+    return line
+
+
+def plot_line_high(x0, y0, x1, y1):
+    dx = x1 - x0
+    dy = y1 - y0
+    xi = 1
+    if dx < 0:
+        xi = -1
+        dx = -dx
+    D = (2 * dx) - dy
+    x = x0
+    line = []
+    for y in range(y0, y1 + 1):
+        line.append([x, y])
+        if D > 0:
+            x = x + xi
+            D = D + (2 * (dx - dy))
+        else:
+            D = D + 2*dx
+    return line
+
+
+def plot_line(x0, y0, x1, y1):
+    """Helper function that returns cells in line from (x0, y0) to (x1, y1)"""
+    if abs(y1 - y0) < abs(x1 - x0):
+        if x0 > x1:
+            return plot_line_low(x1, y1, x0, y0)
+        return plot_line_low(x0, y0, x1, y1)
+    if y0 > y1:
+        return plot_line_high(x1, y1, x0, y0)
+    return plot_line_high(x0, y0, x1, y1)
+
+
 class MoveStrategy(ABC):
     @staticmethod
     @abstractmethod
@@ -142,6 +193,14 @@ class AggressiveEnemy(NPC):
         return [x, y] == level.player
 
     def player_visible(self, level):
+        line = plot_line(*self.cur_pos, *level.player.cur_pos)
+        if self.cur_pos == line[-1]:
+            line = reversed(line)
+        for (i, cell) in enumerate(line):
+            if i >= 5:
+                return False
+            if cell in level.walls:
+                return False
         return True
 
     @property

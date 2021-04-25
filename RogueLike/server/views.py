@@ -129,7 +129,7 @@ def generate_map():
     is_start = True
     x = -1
     y = -1
-    for i in range(16):
+    for i in range(24):
         while is_start or ([x, y] in taken):
             x = random.randint(1, 19)
             y = random.randint(1, 19)
