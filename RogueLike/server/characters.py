@@ -108,10 +108,10 @@ class NPC(Character):
 
 
 class AggressiveEnemy(NPC):
-    def __init__(self, x, y):
+    def __init__(self, x, y, health=20):
         self.x = x
         self.y = y
-        self.health = 20
+        self.health = health
         self.attack = 5
 
     @property
@@ -132,7 +132,7 @@ class AggressiveEnemy(NPC):
             return False
         if [x, y] in level.walls:
             return False
-        if [x, y] in [e.cur_pos for e in level.agr_enemies]:
+        if [x, y] in [e.cur_pos for e in level.enemies]:
             return False
         if [x, y] == level.player.cur_pos:
             return False
@@ -165,10 +165,10 @@ class AggressiveEnemy(NPC):
 
 
 class Player(Character):
-    def __init__(self, x, y):
+    def __init__(self, x, y, health=100):
         self.x = x
         self.y = y
-        self.health = 100
+        self.health = health
         self.attack = 10
 
     @property
@@ -184,14 +184,14 @@ class Player(Character):
         return self._attack
 
     def should_attack(self, x, y, level):
-        return [x, y] in level.agr_enemies
+        return [x, y] in level.enemies
 
     def can_move(self, x, y, level):
         if x < 0 or y < 0 or x > 19 or y > 19:
             return False
         if [x, y] in level.walls:
             return False
-        if [x, y] in [e.cur_pos for e in level.agr_enemies]:
+        if [x, y] in [e.cur_pos for e in level.enemies]:
             return False
         return True
 
@@ -214,9 +214,9 @@ class Player(Character):
 class CharacterEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
         if isinstance(o, AggressiveEnemy):
-            return {'__ch_type__': 'agr_enemy', 'cur_pos': o.cur_pos}
+            return {'kind': 'agr_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
         if isinstance(o, Player):
-            return {'__ch_type__': 'player', 'cur_pos': o.cur_pos}
+            return {'kind': 'player', 'cur_pos': o.cur_pos, 'health': o.health}
         return super().default(o)
 
 
@@ -226,8 +226,8 @@ class CharacterDecoder(json.JSONDecoder):
 
     @staticmethod
     def object_hook(obj):
-        if (ch_type := obj.get('__ch_type__', '')) == 'agr_enemy':
-            return AggressiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1])
+        if (ch_type := obj.get('kind', '')) == 'agr_enemy':
+            return AggressiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
         elif ch_type == 'player':
-            return Player(obj['cur_pos'][0], obj['cur_pos'][1])
+            return Player(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
         return obj

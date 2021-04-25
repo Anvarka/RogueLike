@@ -12,7 +12,7 @@ class User(models.Model):
     walls = models.JSONField(default=get_fresh_default)
     stairs = models.JSONField(default=get_fresh_default)
     player = models.JSONField(default=get_fresh_default, encoder=CharacterEncoder, decoder=CharacterDecoder)
-    agr_enemies = models.JSONField(default=get_fresh_default, encoder=CharacterEncoder, decoder=CharacterDecoder)
+    enemies = models.JSONField(default=get_fresh_default, encoder=CharacterEncoder, decoder=CharacterDecoder)
 
     def __str__(self):
-        return f"user_id: {self.user_id}, walls: {self.walls}, player: {self.player}, agr_enemies: {self.agr_enemies}"
+        return f"user_id: {self.user_id}, walls: {self.walls}, player: {self.player}, enemies: {self.enemies}"
