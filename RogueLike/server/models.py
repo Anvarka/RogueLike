@@ -13,6 +13,7 @@ class User(models.Model):
     stairs = models.JSONField(default=get_fresh_default)
     player = models.JSONField(default=get_fresh_default, encoder=CharacterEncoder, decoder=CharacterDecoder)
     enemies = models.JSONField(default=get_fresh_default, encoder=CharacterEncoder, decoder=CharacterDecoder)
+    game_over = models.JSONField(default=False)
 
     def __str__(self):
         return f"user_id: {self.user_id}, walls: {self.walls}, player: {self.player}, enemies: {self.enemies}"

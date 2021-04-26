@@ -20,7 +20,7 @@ def plot_line_low(x0, y0, x1, y1):
             y = y + yi
             d = d + (2 * (dy - dx))
         else:
-            d = d + 2*dy
+            d = d + 2 * dy
     return line
 
 
@@ -40,7 +40,7 @@ def plot_line_high(x0, y0, x1, y1):
             x = x + xi
             D = D + (2 * (dx - dy))
         else:
-            D = D + 2*dx
+            D = D + 2 * dx
     return line
 
 
@@ -56,6 +56,10 @@ def plot_line(x0, y0, x1, y1):
 
 
 class MoveStrategy(ABC):
+    """
+    Class describing the behavior of character
+    """
+
     @staticmethod
     @abstractmethod
     def get_next_move(cur_pos, level):
@@ -63,12 +67,20 @@ class MoveStrategy(ABC):
 
 
 class RandomMoveStrategy(MoveStrategy):
+    """
+    Class describing the behavior of an passive character
+    """
+
     @staticmethod
     def get_next_move(cur_pos, level):
         return random.choice(['up', 'down', 'left', 'right'])
 
 
 class AggressiveMoveStrategy(MoveStrategy):
+    """
+    Сlass describing the behavior of an aggressive character
+    """
+
     @staticmethod
     def get_next_move(cur_pos, level):
         possible_directions = []
@@ -86,6 +98,10 @@ class AggressiveMoveStrategy(MoveStrategy):
 
 
 class Character(ABC):
+    """
+    Class describing the character
+    """
+
     @property
     @abstractmethod
     def cur_pos(self):
@@ -146,9 +162,18 @@ class Character(ABC):
             return
 
         if self.should_attack(cur_x, cur_y, level):
-            # insert attack here
-            pass
 
+            for enemy_obj in level.enemies:
+                if [cur_x, cur_y] == enemy_obj.cur_pos:
+                    level.enemies[enemy_obj].health(enemy_obj.health - self.attack)
+                    if enemy_obj.health <= 0:
+                        level.enemies.remove(enemy_obj)
+                    level.save()
+            if [cur_x, cur_y] == level.player.cur_pos:
+                level.player.health -= self.attack
+                if level.player.health <= 0:
+                    level.game_over = True
+            level.save()
         return
 
 
@@ -156,6 +181,77 @@ class NPC(Character):
     @abstractmethod
     def get_next_move(self, level):
         pass
+
+
+class PassiveEnemy(NPC):
+    """
+    Class of a passive enemy
+    """
+
+    def __init__(self, x, y, health=10):
+        self.x = x
+        self.y = y
+        self.health = health
+        self.attack = 3
+
+    @property
+    def cur_pos(self):
+        """
+        return the current position of enemy
+        """
+        return [self.x, self.y]
+
+    @cur_pos.setter
+    def cur_pos(self, value):
+        """
+        setter the current position of enemy
+        """
+        self.x, self.y = value
+
+    def get_next_move(self, level):
+        """
+        return the next position if enemy
+        """
+        return RandomMoveStrategy.get_next_move(self.cur_pos, level)
+
+    def should_attack(self, x, y, level):
+        """
+        don't attack enemy
+        """
+        return [x, y] == level.player.cur_pos
+
+    def can_move(self, x, y, level):
+        """
+        Function for check next step
+        """
+        if x < 0 or y < 0 or x > 19 or y > 19:
+            return False
+        if [x, y] in level.walls:
+            return False
+        if [x, y] in [e.cur_pos for e in level.enemies]:
+            return False
+        if [x, y] == level.player.cur_pos:
+            return False
+        return True
+
+    @property
+    def health(self):
+        return self._health
+
+    @health.setter
+    def health(self, value):
+        self._health = value
+
+    @property
+    def attack(self):
+        return self._attack
+
+    @attack.setter
+    def attack(self, value):
+        self._attack = value
+
+    def encode_for_client(self):
+        return self.cur_pos
 
 
 class AggressiveEnemy(NPC):
@@ -190,7 +286,7 @@ class AggressiveEnemy(NPC):
         return True
 
     def should_attack(self, x, y, level):
-        return [x, y] == level.player
+        return [x, y] == level.player.cur_pos
 
     def player_visible(self, level):
         line = plot_line(*self.cur_pos, *level.player.cur_pos)
@@ -224,6 +320,10 @@ class AggressiveEnemy(NPC):
 
 
 class Player(Character):
+    """
+    Class describing the player
+    """
+
     def __init__(self, x, y, health=100):
         self.x = x
         self.y = y
@@ -243,7 +343,11 @@ class Player(Character):
         return self._attack
 
     def should_attack(self, x, y, level):
-        return [x, y] in level.enemies
+        for enemy in level.enemies:
+            print("Vsl" + enemy.cur_pos)
+            if [x, y] == enemy.cur_pos:
+                return True
+        return False
 
     def can_move(self, x, y, level):
         if x < 0 or y < 0 or x > 19 or y > 19:
@@ -274,6 +378,8 @@ class CharacterEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
         if isinstance(o, AggressiveEnemy):
             return {'kind': 'agr_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
+        if isinstance(o, PassiveEnemy):
+            return {'kind': 'passive_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
         if isinstance(o, Player):
             return {'kind': 'player', 'cur_pos': o.cur_pos, 'health': o.health}
         return super().default(o)
@@ -287,6 +393,8 @@ class CharacterDecoder(json.JSONDecoder):
     def object_hook(obj):
         if (ch_type := obj.get('kind', '')) == 'agr_enemy':
             return AggressiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+        elif (ch_type := obj.get('kind', '')) == 'passive_enemy':
+            return PassiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
         elif ch_type == 'player':
             return Player(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
         return obj

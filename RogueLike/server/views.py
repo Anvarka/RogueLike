@@ -7,6 +7,8 @@ from enum import Enum
 from server import models
 from server.characters import AggressiveEnemy, Player, CharacterEncoder
 
+from server.characters import PassiveEnemy
+
 
 class Move(Enum):
     up = "up"
@@ -29,7 +31,8 @@ def get_map(request):
         "walls": user_info.walls,
         "stairs": user_info.stairs,
         "player": user_info.player,
-        "enemies": user_info.enemies
+        "enemies": user_info.enemies,
+        "game_over": False
     }
     return JsonResponse(response_message, encoder=CharacterEncoder, safe=False)
 
@@ -74,7 +77,6 @@ def player_move(request):
         new_pos = [0, 0]
 
     user_info.player.cur_pos = new_pos
-
     for enemy in user_info.enemies:
         enemy.move(enemy.get_next_move(user_info), user_info)
 
@@ -82,7 +84,8 @@ def player_move(request):
         "walls": user_info.walls,
         "player": user_info.player,
         "stairs": user_info.stairs,
-        "enemies": user_info.enemies
+        "enemies": user_info.enemies,
+        "game_over": False
     }
     user_info.save()
 
@@ -100,7 +103,12 @@ def connect(request):
 
     if is_user_new(user_id):
         walls, stairs, enemies = generate_map()
-        models.User.objects.create(user_id=user_id, walls=walls, stairs=stairs, player=Player(0, 0), enemies=enemies)
+        models.User.objects.create(user_id=user_id,
+                                   walls=walls,
+                                   stairs=stairs,
+                                   player=Player(0, 0),
+                                   enemies=enemies,
+                                   game_over=False)
         return HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")
     else:
         return HttpResponse(f"Вы уже были зарегистрированы, {user_id}")
@@ -122,33 +130,45 @@ def generate_map():
     """
     Generate map of size 20 x 20
     """
-
     walls = []
     enemies = []
     taken = []
-    is_start = True
-    x = -1
-    y = -1
+
     for i in range(24):
-        while is_start or ([x, y] in taken):
-            x = random.randint(1, 19)
-            y = random.randint(1, 19)
-            is_start = False
+        x, y = generate_coordinate(taken, is_start=True)
         walls.append([x, y])
         taken.append([x, y])
 
-    for i in range(3):
-        x = random.randint(1, 19)
-        y = random.randint(1, 19)
-        while [x, y] in taken:
-            x = random.randint(1, 19)
-            y = random.randint(1, 19)
-        enemies.append(AggressiveEnemy(x, y))
-        taken.append([x, y])
+    generate_enemy(taken, enemies, is_aggressive=True, count=3)
+    generate_enemy(taken, enemies, is_aggressive=False, count=2)
 
-    while [x, y] in taken:
-        x = random.randint(1, 19)
-        y = random.randint(1, 19)
+    x, y = generate_coordinate(taken)
     stairs = [x, y]
 
     return walls, stairs, enemies
+
+
+def generate_enemy(taken, enemies, is_aggressive=False, count=3):
+    """
+    Function for generating position of enemies
+    """
+    for i in range(count):
+        x, y = generate_coordinate(taken)
+        if is_aggressive:
+            enemies.append(AggressiveEnemy(x, y))
+        else:
+            enemies.append(PassiveEnemy(x, y))
+        taken.append([x, y])
+
+
+def generate_coordinate(taken, is_start=False):
+    """
+    Function for generating coordinates
+    """
+    x = random.randint(1, 19)
+    y = random.randint(1, 19)
+    while is_start or ([x, y] in taken):
+        x = random.randint(1, 19)
+        y = random.randint(1, 19)
+        is_start = False
+    return x, y
