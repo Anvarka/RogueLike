@@ -32,7 +32,7 @@ def get_map(request):
         "stairs": user_info.stairs,
         "player": user_info.player,
         "enemies": user_info.enemies,
-        "game_over": False
+        "game_over": user_info.game_over
     }
     return JsonResponse(response_message, encoder=CharacterEncoder, safe=False)
 
@@ -47,36 +47,16 @@ def player_move(request):
     direction = request_message["direction"]
     user_info = models.User.objects.get(user_id=user_id)
     player = user_info.player
-    cur_x = player.cur_pos[0]
-    cur_y = player.cur_pos[1]
 
-    if direction == Move.up.name:
-        new_pos = [cur_x, cur_y - 1]
-    elif direction == Move.down.name:
-        new_pos = [cur_x, cur_y + 1]
-    elif direction == Move.left.name:
-        new_pos = [cur_x - 1, cur_y]
-    elif direction == Move.right.name:
-        new_pos = [cur_x + 1, cur_y]
-    else:
-        return HttpResponse("Error")
-    x = new_pos[0]
-    y = new_pos[1]
-    walls = user_info.walls
-    stairs = user_info.stairs
+    player.move(direction, user_info)
 
-    if x > 19 or y > 19 or x < 0 or y < 0 or (new_pos in walls):
-        new_pos = [cur_x, cur_y]
-
-    if new_pos == stairs:
+    if player.cur_pos == user_info.stairs:
         walls, stairs, enemies = generate_map()
         user_info.walls = walls
         user_info.stairs = stairs
         user_info.enemies = enemies
+        user_info.cur_pos = [0, 0]
 
-        new_pos = [0, 0]
-
-    user_info.player.cur_pos = new_pos
     for enemy in user_info.enemies:
         enemy.move(enemy.get_next_move(user_info), user_info)
 
@@ -85,7 +65,7 @@ def player_move(request):
         "player": user_info.player,
         "stairs": user_info.stairs,
         "enemies": user_info.enemies,
-        "game_over": False
+        "game_over": user_info.game_over
     }
     user_info.save()
 

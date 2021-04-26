@@ -6,6 +6,7 @@ import com.googlecode.lanterna.TerminalSize
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.features.json.*
+import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.runBlocking
 
@@ -22,6 +23,14 @@ class Client(private val user: String,
 
     fun gameLoop() {
         while (true) {
+            if (map.gameOver) {
+                screen.clear()
+                val graphics = screen.newTextGraphics()
+                graphics.putString(4, 10, "Game Over!")
+                screen.refresh()
+                screen.readInput()
+                return
+            }
             map.draw(screen)
             val key = screen.readInput()
             if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
@@ -84,7 +93,11 @@ fun main(args: Array<String>) {
         val screen = TerminalScreen(term)
         screen.startScreen()
         screen.cursorPosition = null
-        HttpClient(CIO){ install(JsonFeature) }.use { httpClient ->
+        HttpClient(CIO){ install(JsonFeature) {
+            serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
+                ignoreUnknownKeys = true
+            })
+        }}.use { httpClient ->
             val client = Client(user, screen, httpClient, server)
             client.gameLoop()
         }

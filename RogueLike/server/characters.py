@@ -133,7 +133,7 @@ class Character(ABC):
         pass
 
     @abstractmethod
-    def should_attack(self, x, y, level):
+    def should_attack(self, opposing_char):
         pass
 
     @abstractmethod
@@ -161,19 +161,12 @@ class Character(ABC):
             self.cur_pos = [cur_x, cur_y]
             return
 
-        if self.should_attack(cur_x, cur_y, level):
-
-            for enemy_obj in level.enemies:
-                if [cur_x, cur_y] == enemy_obj.cur_pos:
-                    level.enemies[enemy_obj].health(enemy_obj.health - self.attack)
-                    if enemy_obj.health <= 0:
-                        level.enemies.remove(enemy_obj)
-                    level.save()
-            if [cur_x, cur_y] == level.player.cur_pos:
-                level.player.health -= self.attack
-                if level.player.health <= 0:
-                    level.game_over = True
-            level.save()
+        if (opposing_char := level.get_char_at(cur_x, cur_y)) is not None:
+            if self.should_attack(opposing_char):
+                opposing_char.health = opposing_char.health - self.attack
+                if opposing_char.health <= 0:
+                    level.remove_char(opposing_char)
+                    self.cur_pos = [cur_x, cur_y]
         return
 
 
@@ -214,11 +207,11 @@ class PassiveEnemy(NPC):
         """
         return RandomMoveStrategy.get_next_move(self.cur_pos, level)
 
-    def should_attack(self, x, y, level):
+    def should_attack(self, opposing_char):
         """
         don't attack enemy
         """
-        return [x, y] == level.player.cur_pos
+        return isinstance(opposing_char, Player)
 
     def can_move(self, x, y, level):
         """
@@ -285,8 +278,8 @@ class AggressiveEnemy(NPC):
             return False
         return True
 
-    def should_attack(self, x, y, level):
-        return [x, y] == level.player.cur_pos
+    def should_attack(self, opposing_char):
+        return isinstance(opposing_char, Player)
 
     def player_visible(self, level):
         line = plot_line(*self.cur_pos, *level.player.cur_pos)
@@ -342,12 +335,8 @@ class Player(Character):
     def attack(self):
         return self._attack
 
-    def should_attack(self, x, y, level):
-        for enemy in level.enemies:
-            print("Vsl" + enemy.cur_pos)
-            if [x, y] == enemy.cur_pos:
-                return True
-        return False
+    def should_attack(self, opposing_char):
+        return isinstance(opposing_char, AggressiveEnemy) or isinstance(opposing_char, PassiveEnemy)
 
     def can_move(self, x, y, level):
         if x < 0 or y < 0 or x > 19 or y > 19:

@@ -12,7 +12,11 @@ import java.lang.RuntimeException
 data class Character(val kind: String, val health: Int, @SerialName("cur_pos") val curPos: List<Int>)
 
 @Serializable
-data class Map(val walls: List<List<Int>>, val player: Character, val stairs: List<Int>, val enemies: List<Character>) {
+data class Map(val walls: List<List<Int>>,
+               val player: Character,
+               val stairs: List<Int>,
+               val enemies: List<Character>,
+               @SerialName("game_over") val gameOver: Boolean) {
     fun draw(screen: TerminalScreen) {
         screen.clear()
         for (wall in walls) {
@@ -21,7 +25,7 @@ data class Map(val walls: List<List<Int>>, val player: Character, val stairs: Li
         for (enemy in enemies) {
             val icon = when (enemy.kind) {
                 "agr_enemy" -> TextCharacter.fromCharacter('E', TextColor.ANSI.RED, TextColor.ANSI.DEFAULT)[0]
-                "pas_enemy" -> TextCharacter.fromCharacter('P', TextColor.ANSI.BLUE, TextColor.ANSI.DEFAULT)[0]
+                "passive_enemy" -> TextCharacter.fromCharacter('P', TextColor.ANSI.BLUE, TextColor.ANSI.DEFAULT)[0]
                 else -> throw RuntimeException("unknown enemy type")
             }
             screen.setCharacter(enemy.curPos[0], enemy.curPos[1], icon)
