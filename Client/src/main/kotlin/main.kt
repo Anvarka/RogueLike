@@ -31,7 +31,7 @@ class Client(private val user: String,
                 screen.readInput()
                 return
             }
-            map.draw(screen)
+            screen.drawMap(map)
             val key = screen.readInput()
             if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
                 return
@@ -87,7 +87,7 @@ fun main(args: Array<String>) {
     val server = args[1]
     val fontConfig = SwingTerminalFontConfiguration.getDefaultOfSize(25)
     val terminalFactory = DefaultTerminalFactory()
-        .setInitialTerminalSize(TerminalSize(20, 20))
+        .setInitialTerminalSize(TerminalSize(20, 23))
         .setTerminalEmulatorFontConfiguration(fontConfig)
     terminalFactory.createTerminal().use { term ->
         val screen = TerminalScreen(term)
