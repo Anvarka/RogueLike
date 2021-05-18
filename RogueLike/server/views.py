@@ -11,7 +11,7 @@ from server.characters import AggressiveEnemy, Player, CharacterEncoder
 from server.characters import PassiveEnemy
 
 
-current_players = {}
+current_players = {}  # user_id -> ip user
 current_map = None
 
 
@@ -58,6 +58,18 @@ def get_map(request):
 
 
 @api_view(['POST'])
+def player_disconnet(request):
+    # Убрать из карты
+    # Убрать из текущих игроков
+    # Но запомнить место на карте / здоровье ...
+    # И возмжно поменять last_modified
+    pass
+
+
+# Завести таймер и если в течениии минуты игрок не ответил, то дисконнектим его
+
+
+@api_view(['POST'])
 def player_move(request):
     """
     Change the position of the player depending on the command
@@ -96,8 +108,12 @@ def player_move(request):
     }
     user_info.save()
     
-    req = requests.post(current_players[user_id] + '/state', params={'value': 'WAIT'})
+    for player in current_players:
+        req = requests.post(current_players[user_id] + '/state', params={'value': 'WAIT', 'map': 'map'})
     notifier.notifiy_active_next()
+
+    # if notifier.last_modified == последний в круге:
+    #    сходить врагами
 
     return JsonResponse(response_message, encoder=CharacterEncoder, safe=False)
 
@@ -125,7 +141,7 @@ def connect(request):
     else:
         session = models.Session.objects.get()
         if user_id not in [pl.user_id for pl in session.players]:
-            session.players.append(Player(0, 0, user_id))
+            session.players.append(Player(0, 0, user_id)) # Проверить, что (0, 0 не занято)
         session.save()
 
     response = HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")

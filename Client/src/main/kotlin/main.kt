@@ -52,6 +52,8 @@ class Client(private val user: String,
                 conditionVariable.receive()
             }
             System.err.println("WAIT INPUT !!!")
+
+            // Повтор движений
             val key = screen.readInput()
             if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
                 return
