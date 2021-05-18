@@ -7,3 +7,5 @@ urlpatterns = [
     path('move/', views.player_move, name='move'),
     path('connect/', views.connect, name='connect'),
 ]
+
+current_players = []

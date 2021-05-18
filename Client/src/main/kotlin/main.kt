@@ -3,22 +3,36 @@ import com.googlecode.lanterna.screen.TerminalScreen
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
 import com.googlecode.lanterna.terminal.swing.SwingTerminalFontConfiguration
 import com.googlecode.lanterna.TerminalSize
+import io.ktor.application.*
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.features.json.*
 import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
+import io.ktor.response.*
+import io.ktor.routing.*
+import io.ktor.server.engine.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+
+enum class State {
+    WAIT,
+    ACTIVE
+}
 
 class Client(private val user: String,
              private val screen: TerminalScreen,
              private val client: HttpClient,
              private val server: String) {
     private var map: Map
+    var state: State
+    val conditionVariable: Channel<Unit> = Channel(0)
 
     init {
         connect()
         map = getMapInit()
+        state = State.WAIT
     }
 
     fun gameLoop() {
@@ -31,7 +45,13 @@ class Client(private val user: String,
                 screen.readInput()
                 return
             }
-            screen.drawMap(map)
+            screen.drawMap(map, user)
+            System.err.println("CHECK STATE: ${state == State.ACTIVE}")
+            while (state != State.ACTIVE) runBlocking {
+                System.err.println("WAITING !!!")
+                conditionVariable.receive()
+            }
+            System.err.println("WAIT INPUT !!!")
             val key = screen.readInput()
             if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
                 return
@@ -46,7 +66,11 @@ class Client(private val user: String,
                 'd' -> Direction.RIGHT
                 else -> continue
             }
+            state = State.WAIT
             map = move(dir)
+            runBlocking {
+                delay(100)
+            }
         }
     }
 
@@ -83,9 +107,35 @@ fun main(args: Array<String>) {
         System.err.println("usage: ./gradlew run --args=\"NICKNAME SERVER\"")
         return
     }
+
     val user = args[0]
     val server = args[1]
     val fontConfig = SwingTerminalFontConfiguration.getDefaultOfSize(25)
+    var client: Client? = null
+    var startState: State = State.WAIT
+    val port = if (user == "was") {
+        1235
+    } else {
+        1234
+    }
+    embeddedServer(io.ktor.server.cio.CIO, port = port) {
+        routing {
+            post("/state") {
+                if (call.request.queryParameters["value"] == "ACTIVE") {
+                    System.err.println("SET ACTIVE STATE")
+                    client?.state = State.ACTIVE
+                    startState = State.ACTIVE
+                } else if (call.request.queryParameters["value"] == "WAIT") {
+                    System.err.println("SET WAIT STATE")
+                    client?.state = State.WAIT
+                    startState = State.WAIT
+                }
+                client?.conditionVariable?.offer(Unit)
+                System.err.println("OFFERED")
+                call.respondText("OK")
+            }
+        }
+    }.start(wait = false)
     val terminalFactory = DefaultTerminalFactory()
         .setInitialTerminalSize(TerminalSize(20, 23))
         .setTerminalEmulatorFontConfiguration(fontConfig)
@@ -98,8 +148,9 @@ fun main(args: Array<String>) {
                 ignoreUnknownKeys = true
             })
         }}.use { httpClient ->
-            val client = Client(user, screen, httpClient, server)
-            client.gameLoop()
+            client = Client(user, screen, httpClient, server)
+            client?.state = startState
+            client?.gameLoop()
         }
     }
 }

@@ -4,7 +4,7 @@ import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.screen.TerminalScreen
 import java.lang.RuntimeException
 
-fun TerminalScreen.drawMap(state: Map) {
+fun TerminalScreen.drawMap(state: Map, curPlayer: String) {
     this.clear()
     for (wall in state.walls) {
         this.setCharacter(wall[0], wall[1], TextCharacter.fromCharacter('#')[0])
@@ -18,9 +18,16 @@ fun TerminalScreen.drawMap(state: Map) {
         this.setCharacter(enemy.curPos[0], enemy.curPos[1], icon)
     }
     this.setCharacter(state.stairs[0], state.stairs[1], TextCharacter.fromCharacter('>')[0])
-    this.setCharacter(state.player.curPos[0], state.player.curPos[1], TextCharacter.fromCharacter('@')[0])
+    var health = 0
+    for (player in state.players) {
+        val icon = when (player.userId) {
+            curPlayer -> { health = player.health;  TextCharacter.fromCharacter('@', TextColor.ANSI.GREEN, TextColor.ANSI.DEFAULT)[0] }
+            else -> TextCharacter.fromCharacter('@')[0]
+        }
+        this.setCharacter(player.curPos[0], player.curPos[1], icon)
+    }
     val healthGraphics = this.newTextGraphics()
     healthGraphics.drawLine(0, 20, 19, 20, Symbols.DOUBLE_LINE_HORIZONTAL)
-    healthGraphics.putString(0, 21, "Health: ${state.player.health}")
+    healthGraphics.putString(0, 21, "Health: $health")
     this.refresh()
 }

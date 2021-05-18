@@ -81,16 +81,17 @@ class AggressiveMoveStrategy(MoveStrategy):
     Сlass describing the behavior of an aggressive character
     """
 
+    # TODO: do not select only 1st player
     @staticmethod
     def get_next_move(cur_pos, level):
         possible_directions = []
-        if cur_pos[0] < level.player.cur_pos[0]:  # X coordinate
+        if cur_pos[0] < level.players[0].cur_pos[0]:  # X coordinate
             possible_directions.append('right')
-        elif cur_pos[0] > level.player.cur_pos[0]:
+        elif cur_pos[0] > level.players[0].cur_pos[0]:
             possible_directions.append('left')
-        if cur_pos[1] < level.player.cur_pos[1]:  # Y coordinate
+        if cur_pos[1] < level.players[0].cur_pos[1]:  # Y coordinate
             possible_directions.append('down')
-        elif cur_pos[1] > level.player.cur_pos[1]:
+        elif cur_pos[1] > level.players[0].cur_pos[1]:
             possible_directions.append('up')
         if not possible_directions:
             return RandomMoveStrategy.get_next_move(cur_pos, level)
@@ -223,7 +224,7 @@ class PassiveEnemy(NPC):
             return False
         if [x, y] in [e.cur_pos for e in level.enemies]:
             return False
-        if [x, y] == level.player.cur_pos:
+        if [x, y] in [pl.cur_pos for pl in level.players]:
             return False
         return True
 
@@ -274,15 +275,16 @@ class AggressiveEnemy(NPC):
             return False
         if [x, y] in [e.cur_pos for e in level.enemies]:
             return False
-        if [x, y] == level.player.cur_pos:
+        if [x, y] in [pl.cur_pos for pl in level.players]:
             return False
         return True
 
     def should_attack(self, opposing_char):
         return isinstance(opposing_char, Player)
 
+    # TODO: select not only 1st player
     def player_visible(self, level):
-        line = plot_line(*self.cur_pos, *level.player.cur_pos)
+        line = plot_line(*self.cur_pos, *level.players[0].cur_pos)
         if self.cur_pos == line[-1]:
             line = reversed(line)
         for (i, cell) in enumerate(line):
@@ -317,11 +319,12 @@ class Player(Character):
     Class describing the player
     """
 
-    def __init__(self, x, y, health=100):
+    def __init__(self, x, y, user_id, health=100):
         self.x = x
         self.y = y
         self.health = health
         self.attack = 10
+        self.user_id = user_id
 
     @property
     def cur_pos(self):
@@ -360,7 +363,7 @@ class Player(Character):
         self.x, self.y = value
 
     def encode_for_client(self):
-        return self.cur_pos
+        return (self.user_id, self.cur_pos)
 
 
 class CharacterEncoder(json.JSONEncoder):
@@ -370,7 +373,7 @@ class CharacterEncoder(json.JSONEncoder):
         if isinstance(o, PassiveEnemy):
             return {'kind': 'passive_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
         if isinstance(o, Player):
-            return {'kind': 'player', 'cur_pos': o.cur_pos, 'health': o.health}
+            return {'kind': 'player', 'cur_pos': o.cur_pos, 'health': o.health, 'user_id': o.user_id}
         return super().default(o)
 
 
@@ -385,5 +388,5 @@ class CharacterDecoder(json.JSONDecoder):
         elif (ch_type := obj.get('kind', '')) == 'passive_enemy':
             return PassiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
         elif ch_type == 'player':
-            return Player(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return Player(obj['cur_pos'][0], obj['cur_pos'][1], obj['user_id'], obj['health'])
         return obj

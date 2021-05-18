@@ -1,5 +1,6 @@
 import json
 import random
+import requests
 from rest_framework.decorators import api_view
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse, JsonResponse
@@ -8,6 +9,25 @@ from server import models
 from server.characters import AggressiveEnemy, Player, CharacterEncoder
 
 from server.characters import PassiveEnemy
+
+
+current_players = {}
+current_map = None
+
+
+class PlayerNotifier():
+    def __init__(self):
+        self.last_notified = -1
+
+    def notifiy_active_next(self):
+        self.last_notified = (self.last_notified + 1) % len(current_players) 
+        notify_id = list(current_players.keys())[self.last_notified]
+        print("NOTIFY ACTIVE: " + notify_id)
+        req = requests.post(current_players[notify_id] + '/state', params={'value': 'ACTIVE'})
+        print(req.url)
+
+
+notifier = PlayerNotifier()
 
 
 class Move(Enum):
@@ -23,14 +43,14 @@ def get_map(request):
     function for getting map
     """
     request_message = json.loads(request.body)
-    if is_user_new(request_message["user_id"]):
+    if not session_exists():
         return HttpResponse("Вы еще не зарегистрированы")
     user_id = request_message["user_id"]
-    user_info = models.User.objects.get(user_id=user_id)
+    user_info = models.Session.objects.get()
     response_message = {
         "walls": user_info.walls,
         "stairs": user_info.stairs,
-        "player": user_info.player,
+        "players": user_info.players,
         "enemies": user_info.enemies,
         "game_over": user_info.game_over
     }
@@ -45,8 +65,12 @@ def player_move(request):
     request_message = json.loads(request.body)
     user_id = request_message["user_id"]
     direction = request_message["direction"]
-    user_info = models.User.objects.get(user_id=user_id)
-    player = user_info.player
+    user_info = models.Session.objects.get()
+    player = None
+    for pl in user_info.players:
+        if pl.user_id == user_id:
+            player = pl
+            break
 
     player.move(direction, user_info)
 
@@ -55,19 +79,25 @@ def player_move(request):
         user_info.walls = walls
         user_info.stairs = stairs
         user_info.enemies = enemies
-        user_info.cur_pos = [0, 0]
+        for (i, pl) in enumerate(user_info.players):
+            pl.cur_pos = [0, i]
+        # user_info.cur_pos = [0, 0]
 
+    # TODO: enemies move too much now
     for enemy in user_info.enemies:
         enemy.move(enemy.get_next_move(user_info), user_info)
 
     response_message = {
         "walls": user_info.walls,
-        "player": user_info.player,
+        "players": user_info.players,
         "stairs": user_info.stairs,
         "enemies": user_info.enemies,
         "game_over": user_info.game_over
     }
     user_info.save()
+    
+    req = requests.post(current_players[user_id] + '/state', params={'value': 'WAIT'})
+    notifier.notifiy_active_next()
 
     return JsonResponse(response_message, encoder=CharacterEncoder, safe=False)
 
@@ -80,18 +110,41 @@ def connect(request):
     """
     request_message = json.loads(request.body)
     user_id = request_message["user_id"]
-
-    if is_user_new(user_id):
-        walls, stairs, enemies = generate_map()
-        models.User.objects.create(user_id=user_id,
-                                   walls=walls,
-                                   stairs=stairs,
-                                   player=Player(0, 0),
-                                   enemies=enemies,
-                                   game_over=False)
-        return HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")
+    user_url = request.build_absolute_uri('/').strip('/').rsplit(':', 1)[0]
+    if user_id == 'was':
+        user_url = user_url + ':1235'
     else:
-        return HttpResponse(f"Вы уже были зарегистрированы, {user_id}")
+        user_url = user_url + ':1234'
+    print("USER_URL: " + user_url)
+
+    current_players[user_id] = user_url
+    response = None
+    if not session_exists():
+        walls, stairs, enemies = generate_map()
+        models.Session.objects.create(walls=walls,stairs=stairs,players=[Player(0, 0, user_id)], enemies=enemies, game_over=False)
+    else:
+        session = models.Session.objects.get()
+        if user_id not in [pl.user_id for pl in session.players]:
+            session.players.append(Player(0, 0, user_id))
+        session.save()
+
+    response = HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")
+
+    if len(current_players) == 1:
+        init_state = 'ACTIVE'
+    else:
+        init_state = 'WAIT'
+    req = requests.post(user_url + '/state', params={'value': init_state})
+
+    return response
+
+
+def session_exists():
+    try:
+        session = models.Session.objects.get()
+        return True
+    except ObjectDoesNotExist:
+        return False
 
 
 def is_user_new(user_id):

@@ -9,11 +9,14 @@ import java.lang.RuntimeException
 
 
 @Serializable
-data class Character(val kind: String, val health: Int, @SerialName("cur_pos") val curPos: List<Int>)
+data class Character(val kind: String,
+                     val health: Int,
+                     @SerialName("cur_pos") val curPos: List<Int>,
+                     @SerialName("user_id") val userId: String? = null)
 
 @Serializable
 data class Map(val walls: List<List<Int>>,
-               val player: Character,
+               val players: List<Character>,
                val stairs: List<Int>,
                val enemies: List<Character>,
                @SerialName("game_over") val gameOver: Boolean)
