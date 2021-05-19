@@ -4,12 +4,13 @@ import time
 import requests
 from rest_framework.decorators import api_view
 from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import ObjectDoesNotExist
 
 from server import models
 from server.characters import AggressiveEnemy, Player, CharacterEncoder, PassiveEnemy
 from server.mapGenerate import generate_map
 from server.utils import create_response_message, get_user_url, create_new_level_map, \
-    initialize_pos_new_player, session_exists
+    initialize_pos_new_player, session_exists, random_string
 
 SIZE_OF_MAP = 19
 COUNT_OF_WALLS = 24
@@ -26,7 +27,15 @@ class PlayerNotifier:
     def __init__(self):
         self.last_notified = -1
 
+    def get_user_num(self, id):
+        for i, u in enumerate(current_players):
+            if u == id:
+                return i
+
     def notifiy_active_next(self):
+        if len(current_players) == 0:
+            return
+
         global is_last_player, active_user, is_make_move
         self.last_notified = (self.last_notified + 1) % len(current_players)
         if self.last_notified == len(current_players) - 1:
@@ -36,20 +45,21 @@ class PlayerNotifier:
 
         print("NOTIFY ACTIVE: " + notify_id)
         req = requests.post(current_players[notify_id] + '/state', params={'value': 'ACTIVE'})
-        print(req.url)
-        t = 10
+        return
+        # print(req.url)
+        # t = 10
+        # # is_make_move = False
+        # while t:
+        #     time.sleep(1)
+        #     t -= 1
+        #     if is_make_move:
+        #         is_make_move = False
+        #         return
         # is_make_move = False
-        while t:
-            time.sleep(1)
-            t -= 1
-            if is_make_move:
-                is_make_move = False
-                return
-        is_make_move = False
-        time.sleep(1)
-        req = requests.post(current_players[notify_id] + '/state', params={'value': 'WAIT'})
-        print(req.url)
-        self.notifiy_active_next()
+        # time.sleep(1)
+        # req = requests.post(current_players[notify_id] + '/state', params={'value': 'WAIT'})
+        # print(req.url)
+        # self.notifiy_active_next()
 
 
 notifier = PlayerNotifier()
@@ -98,6 +108,10 @@ def player_move(request):
             enemy.move(enemy.get_next_move(user_info), user_info)
         is_last_player = False
 
+    player_obj = models.User.objects.get(user_id=user_id)
+    player_obj.last_map = user_info.map_id
+    player_obj.player = player
+    player_obj.save()
     response_message = create_response_message(user_info)
     user_info.save()
 
@@ -125,15 +139,31 @@ def connect(request):
 
     if not session_exists():
         walls, stairs, enemies = generate_map()
-        models.Session.objects.create(walls=walls,
+        player = Player(0, 0, user_id)
+        map_id = random_string()
+        models.Session.objects.create(map_id=map_id,
+                                      walls=walls,
                                       stairs=stairs,
-                                      players=[Player(0, 0, user_id)],
+                                      players=[player],
                                       enemies=enemies,
                                       game_over=False)
+        user = models.User.objects.create(user_id=user_id, player=player, last_map=map_id)
+        user.save()
     else:
         session = models.Session.objects.get()
-        if user_id not in [pl.user_id for pl in session.players]:
-            initialize_pos_new_player(session, user_id)
+        try:
+            old_user = models.User.objects.get(user_id=user_id)
+            if old_user.last_map == session.map_id:
+                session.players.append(old_user.player)
+            else:
+                player = initialize_pos_new_player(session, user_id)
+                old_user.player = player
+                old_user.last_map = session.map_id
+                old_user.save()
+        except ObjectDoesNotExist:
+            player = initialize_pos_new_player(session, user_id)
+            user = models.User.objects.create(user_id=user_id, player=player, last_map=session.map_id)
+            user.save()
         session.save()
 
     response = HttpResponse(f"Поздравляю, вы зарегистрированы, {user_id}")
@@ -155,24 +185,15 @@ def connect(request):
 def correct_disconnect(request):
     request_message = json.loads(request.body)
     user_id = request_message["user_id"]
-    if active_user == user_id:
-        requests.post(current_players[user_id] + '/state', params={'value': 'WAIT'})
-        notifier.notifiy_active_next()
+    print("DISCONNECT: " + user_id)
+    user_num = notifier.get_user_num(user_id)
+    if user_num <= notifier.last_notified:
+        notifier.last_notified -= 1
     current_players.pop(user_id)
+    if active_user == user_id:
+        notifier.notifiy_active_next()
     user_info = models.Session.objects.get()
-    user_info.players.remove(user_id)
+    user_info.players = list(filter(lambda u: u.user_id != user_id, user_info.players))
     user_info.save()
-    # Убрать из карты
-    # Убрать из текущих игроков
-    # Но запомнить место на карте / здоровье ...
-    # И возмжно поменять last_modified
-
-#
-# def incorrect_disconnect(request):
-#     request_message = json.loads(request.body)
-#     user_id = request_message["user_id"]
-#     current_players.pop(user_id)
-#     # Убрать из карты
-#     # Убрать из текущих игроков
-#     # Но запомнить место на карте / здоровье ...
-#     # И возмжно поменять last_modified
+    print("DISCONNECTED: " + user_id)
+    return HttpResponse("Disconnected")

@@ -1,5 +1,8 @@
 from enum import Enum
 
+import random
+import string
+
 from django.core.exceptions import ObjectDoesNotExist
 from server.mapGenerate import generate_map
 from server.characters import Player
@@ -17,6 +20,10 @@ class Move(Enum):
     down = "down"
     left = "left"
     right = "right"
+
+
+def random_string():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=32))
 
 
 def create_response_message(user_info):
@@ -52,8 +59,14 @@ def create_new_level_map(user_info):
     user_info.walls = walls
     user_info.stairs = stairs
     user_info.enemies = enemies
+    user_info.map_id = random_string()
     for (i, pl) in enumerate(user_info.players):
         pl.cur_pos = [0, i]
+        player = models.User.objects.get(user_id=pl.user_id)
+        player.player.cur_pos = pl.cur_pos
+        player.last_map = user_info.map_id
+        player.save()
+    
 
 
 def initialize_pos_new_player(session, user_id):
@@ -70,8 +83,9 @@ def initialize_pos_new_player(session, user_id):
         if [0, i] in taken_poses:
             continue
         else:
-            session.players.append(Player(0, i, user_id))
-            break
+            player = Player(0, i, user_id)
+            session.players.append(player)
+            return player
 
 def session_exists():
     """

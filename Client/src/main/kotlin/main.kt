@@ -12,9 +12,11 @@ import io.ktor.client.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.server.engine.*
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.delay
+import kotlin.io.use
 
 enum class State {
     WAIT,
@@ -24,10 +26,9 @@ enum class State {
 class Client(public val user: String,
              public val screen: TerminalScreen,
              private val client: HttpClient,
-             private val server: String) {
+             private val server: String) : Closeable {
     private var map: Map
     var state: State
-    val conditionVariable: Channel<Unit> = Channel(0)
 
     init {
         connect()
@@ -47,16 +48,14 @@ class Client(public val user: String,
             }
             screen.drawMap(map, user)
             System.err.println("CHECK STATE: ${state == State.ACTIVE}")
-            while (state != State.ACTIVE) runBlocking {
-                System.err.println("WAITING !!!")
-                conditionVariable.receive()
-            }
-            System.err.println("WAIT INPUT !!!")
 
-            // Повтор движений
+
             val key = screen.readInput()
             if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
                 return
+            }
+            if (state == State.WAIT) {
+                continue
             }
             if (key.keyType != KeyType.Character) {
                 continue
@@ -68,11 +67,28 @@ class Client(public val user: String,
                 'd' -> Direction.RIGHT
                 else -> continue
             }
-            state = State.WAIT
             map = move(dir)
-            runBlocking {
-                delay(100)
-            }
+
+//
+//
+//
+//            while (state != State.ACTIVE) {
+////                System.err.println("WAITING !!!")
+////                conditionVariable.receive()
+//                val key = screen.readInput()
+//
+//
+//                // Повтор движений
+//                if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
+//                    return
+//                }
+
+//            state = State.WAIT
+
+//                runBlocking {
+//                    delay(100)
+//                }
+//            }
         }
     }
 
@@ -85,13 +101,26 @@ class Client(public val user: String,
         }
     }
 
-    public fun getMapInit(): Map {
+    fun getMapInit(): Map {
         return runBlocking {
             client.post("$server/server/map/") {
                 header("Content-Type", "application/json")
                 body = UserId(user)
             }
         }
+    }
+
+    private fun disconnect() {
+        return runBlocking {
+            client.post("$server/server/correct_disconnect/") {
+                header("Content-Type", "application/json")
+                body = UserId(user)
+            }
+        }
+    }
+
+    override fun close() {
+        disconnect()
     }
 
     private fun move(dir: Direction): Map {
@@ -124,22 +153,21 @@ fun main(args: Array<String>) {
         routing {
             post("/state") {
                 if (call.request.queryParameters["value"] == "ACTIVE") {
-                    System.err.println("SET ACTIVE STATE")
+                    System.err.println("SET ACTIVE STATE: $client")
                     client?.state = State.ACTIVE
                     startState = State.ACTIVE
                 } else if (call.request.queryParameters["value"] == "WAIT") {
-                    System.err.println("SET WAIT STATE")
+                    System.err.println("SET WAIT STATE $client")
                     client?.state = State.WAIT
                     startState = State.WAIT
                 }
-                client?.conditionVariable?.offer(Unit)
                 System.err.println("OFFERED")
                 call.respondText("OK")
             }
             post("/map") {
                 System.err.println("SET MAP")
-                var newMap = client!!.getMapInit()
-                var newUser:String = client!!.user;
+                val newMap = client!!.getMapInit()
+                val newUser = client!!.user
                 client!!.screen.drawMap(newMap, newUser)
             }
      }
@@ -157,8 +185,10 @@ fun main(args: Array<String>) {
             })
         }}.use { httpClient ->
             client = Client(user, screen, httpClient, server)
-            client?.state = startState
-            client?.gameLoop()
+            client!!.use {
+                it.state = startState
+                it.gameLoop()
+            }
         }
     }
 }
