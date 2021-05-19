@@ -21,8 +21,8 @@ enum class State {
     ACTIVE
 }
 
-class Client(private val user: String,
-             private val screen: TerminalScreen,
+class Client(public val user: String,
+             public val screen: TerminalScreen,
              private val client: HttpClient,
              private val server: String) {
     private var map: Map
@@ -85,7 +85,7 @@ class Client(private val user: String,
         }
     }
 
-    private fun getMapInit(): Map {
+    public fun getMapInit(): Map {
         return runBlocking {
             client.post("$server/server/map/") {
                 header("Content-Type", "application/json")
@@ -136,7 +136,13 @@ fun main(args: Array<String>) {
                 System.err.println("OFFERED")
                 call.respondText("OK")
             }
-        }
+            post("/map") {
+                System.err.println("SET MAP")
+                var newMap = client!!.getMapInit()
+                var newUser:String = client!!.user;
+                client!!.screen.drawMap(newMap, newUser)
+            }
+     }
     }.start(wait = false)
     val terminalFactory = DefaultTerminalFactory()
         .setInitialTerminalSize(TerminalSize(20, 23))
