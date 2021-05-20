@@ -1,10 +1,12 @@
-import asyncio
 import json
 import time
 import requests
+import threading
 from rest_framework.decorators import api_view
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ObjectDoesNotExist
+
+from concurrent.futures import ThreadPoolExecutor
 
 from server import models
 from server.characters import AggressiveEnemy, Player, CharacterEncoder, PassiveEnemy
@@ -19,6 +21,8 @@ is_make_move = False
 is_last_player = False
 active_user = None
 
+turn_taken = threading.Condition()
+
 current_players = {}  # user_id -> ip user
 current_map = None
 
@@ -26,6 +30,10 @@ current_map = None
 class PlayerNotifier:
     def __init__(self):
         self.last_notified = -1
+        self.tp = ThreadPoolExecutor(1)
+
+    def notify_next(self):
+        self.tp.submit(self.notifiy_active_next)
 
     def get_user_num(self, id):
         for i, u in enumerate(current_players):
@@ -33,33 +41,31 @@ class PlayerNotifier:
                 return i
 
     def notifiy_active_next(self):
-        if len(current_players) == 0:
-            return
+        while True:
+            if len(current_players) == 0:
+                return
 
-        global is_last_player, active_user, is_make_move
-        self.last_notified = (self.last_notified + 1) % len(current_players)
-        if self.last_notified == len(current_players) - 1:
-            is_last_player = True
-        notify_id = list(current_players.keys())[self.last_notified]
-        active_user = notify_id
+            global is_last_player, active_user, is_make_move
+            self.last_notified = (self.last_notified + 1) % len(current_players)
+            if self.last_notified == len(current_players) - 1:
+                is_last_player = True
+            notify_id = list(current_players.keys())[self.last_notified]
+            active_user = notify_id
 
-        print("NOTIFY ACTIVE: " + notify_id)
-        req = requests.post(current_players[notify_id] + '/state', params={'value': 'ACTIVE'})
-        return
-        # print(req.url)
-        # t = 10
-        # # is_make_move = False
-        # while t:
-        #     time.sleep(1)
-        #     t -= 1
-        #     if is_make_move:
-        #         is_make_move = False
-        #         return
-        # is_make_move = False
-        # time.sleep(1)
-        # req = requests.post(current_players[notify_id] + '/state', params={'value': 'WAIT'})
-        # print(req.url)
-        # self.notifiy_active_next()
+            print("NOTIFY ACTIVE: " + notify_id)
+            req = requests.post(current_players[notify_id] + '/state', params={'value': 'ACTIVE'})
+            is_make_move = False
+            with turn_taken:
+                print("START WAITING FOR MOVE")
+                if turn_taken.wait_for(lambda: is_make_move, 10.0):
+                    print("GOT MOVE IN TIME")
+                    return
+                else:
+                    print("TRY TO NOTIFY NEXT")
+                    for user_id_cur, ip_address in current_players.items():
+                        requests.post(ip_address + '/state', params={'value': 'WAIT'})
+                    continue
+
 
 
 notifier = PlayerNotifier()
@@ -85,7 +91,9 @@ def player_move(request):
     Change the position of the player depending on the command
     """
     global is_make_move, is_last_player
-    is_make_move = True
+    with turn_taken:
+        is_make_move = True
+        turn_taken.notify()
 
     request_message = json.loads(request.body)
     user_id = request_message["user_id"]
@@ -119,7 +127,7 @@ def player_move(request):
     for user_id_cur, ip_address in current_players.items():
         requests.post(ip_address + '/map')
 
-    notifier.notifiy_active_next()
+    notifier.notify_next()
     return JsonResponse(response_message, encoder=CharacterEncoder, safe=False)
 
 
@@ -191,7 +199,7 @@ def correct_disconnect(request):
         notifier.last_notified -= 1
     current_players.pop(user_id)
     if active_user == user_id:
-        notifier.notifiy_active_next()
+        notifier.notify_next()
     user_info = models.Session.objects.get()
     user_info.players = list(filter(lambda u: u.user_id != user_id, user_info.players))
     user_info.save()

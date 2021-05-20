@@ -46,7 +46,7 @@ class Client(public val user: String,
                 screen.readInput()
                 return
             }
-            screen.drawMap(map, user)
+            screen.drawMap(map, user, state)
             System.err.println("CHECK STATE: ${state == State.ACTIVE}")
 
 
@@ -68,28 +68,11 @@ class Client(public val user: String,
                 else -> continue
             }
             map = move(dir)
-
-//
-//
-//
-//            while (state != State.ACTIVE) {
-////                System.err.println("WAITING !!!")
-////                conditionVariable.receive()
-//                val key = screen.readInput()
-//
-//
-//                // Повтор движений
-//                if (key.keyType == KeyType.Escape || key.keyType == KeyType.EOF) {
-//                    return
-//                }
-
-//            state = State.WAIT
-
-//                runBlocking {
-//                    delay(100)
-//                }
-//            }
         }
+    }
+
+    fun draw() {
+        screen.drawMap(map, user, state)
     }
 
     private fun connect() {
@@ -102,12 +85,13 @@ class Client(public val user: String,
     }
 
     fun getMapInit(): Map {
-        return runBlocking {
+        map = runBlocking {
             client.post("$server/server/map/") {
                 header("Content-Type", "application/json")
                 body = UserId(user)
             }
         }
+        return map
     }
 
     private fun disconnect() {
@@ -162,13 +146,13 @@ fun main(args: Array<String>) {
                     startState = State.WAIT
                 }
                 System.err.println("OFFERED")
+                client?.draw()
                 call.respondText("OK")
             }
             post("/map") {
                 System.err.println("SET MAP")
-                val newMap = client!!.getMapInit()
-                val newUser = client!!.user
-                client!!.screen.drawMap(newMap, newUser)
+                client!!.getMapInit()
+                client!!.draw()
             }
      }
     }.start(wait = false)
