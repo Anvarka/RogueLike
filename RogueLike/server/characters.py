@@ -5,55 +5,25 @@ from server.constants import LEVEL_MIN_X, LEVEL_MIN_Y, LEVEL_MAX_X, LEVEL_MAX_Y
 import json
 
 
-def plot_line_low(x0, y0, x1, y1):
-    dx = x1 - x0
-    dy = y1 - y0
-    yi = 1
-    if dy < 0:
-        yi = -1
-        dy = -dy
-    d = (2 * dy) - dx
-    y = y0
-    line = []
-    for x in range(x0, x1 + 1):
-        line.append([x, y])
-        if d > 0:
-            y = y + yi
-            d = d + (2 * (dy - dx))
-        else:
-            d = d + 2 * dy
-    return line
-
-
-def plot_line_high(x0, y0, x1, y1):
-    dx = x1 - x0
-    dy = y1 - y0
-    xi = 1
-    if dx < 0:
-        xi = -1
-        dx = -dx
-    D = (2 * dx) - dy
-    x = x0
-    line = []
-    for y in range(y0, y1 + 1):
-        line.append([x, y])
-        if D > 0:
-            x = x + xi
-            D = D + (2 * (dx - dy))
-        else:
-            D = D + 2 * dx
-    return line
-
-
 def plot_line(x0, y0, x1, y1):
-    """Helper function that returns cells in line from (x0, y0) to (x1, y1)"""
-    if abs(y1 - y0) < abs(x1 - x0):
-        if x0 > x1:
-            return plot_line_low(x1, y1, x0, y0)
-        return plot_line_low(x0, y0, x1, y1)
-    if y0 > y1:
-        return plot_line_high(x1, y1, x0, y0)
-    return plot_line_high(x0, y0, x1, y1)
+    line = []
+    dx =  abs(x1 - x0)
+    sx = 1 if x0 < x1 else -1
+    dy = -abs(y1 - y0)
+    sy = 1 if y0 < y1 else - 1
+    err = dx + dy  # error value e_xy
+    while True:
+        line.append([x0, y0])
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy: # e_xy+e_x > 0
+            err += dy
+            x0 += sx
+        if e2 <= dx:  # e_xy+e_y < 0
+            err += dx
+            y0 += sy
+    return line
 
 
 class MoveStrategy(ABC):
