@@ -339,12 +339,15 @@ class Player(Character):
 
 class CharacterEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
-        if isinstance(o, AggressiveEnemy):
-            return {'kind': 'agr_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
-        if isinstance(o, PassiveEnemy):
-            return {'kind': 'passive_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
-        if isinstance(o, Player):
-            return {'kind': 'player', 'cur_pos': o.cur_pos, 'health': o.health}
+        if isinstance(o, Character):
+            encoded = {'x': o.x, 'y': o.y, 'health': o.health}
+            if isinstance(o, AggressiveEnemy):
+                encoded['kind'] = 'agr_enemy'
+            elif isinstance(o, PassiveEnemy):
+                encoded['kind'] = 'passive_enemy'
+            else:
+                encoded['kind'] = 'player'
+            return encoded
         return super().default(o)
 
 
@@ -355,9 +358,9 @@ class CharacterDecoder(json.JSONDecoder):
     @staticmethod
     def object_hook(obj):
         if (ch_type := obj.get('kind', '')) == 'agr_enemy':
-            return AggressiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return AggressiveEnemy(obj['x'], obj['y'], obj['health'])
         elif (ch_type := obj.get('kind', '')) == 'passive_enemy':
-            return PassiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return PassiveEnemy(obj['x'], obj['y'], obj['health'])
         elif ch_type == 'player':
-            return Player(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return Player(obj['x'], obj['y'], obj['health'])
         return obj
