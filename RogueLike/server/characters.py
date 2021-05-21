@@ -1,6 +1,7 @@
 import random
 from abc import ABC, abstractmethod
 from typing import Any
+from server.constants import LEVEL_MIN_X, LEVEL_MIN_Y, LEVEL_MAX_X, LEVEL_MAX_Y
 import json
 
 
@@ -136,9 +137,16 @@ class Character(ABC):
     def should_attack(self, opposing_char):
         pass
 
-    @abstractmethod
     def can_move(self, x, y, level):
-        pass
+        if x < LEVEL_MIN_X or y < LEVEL_MIN_Y or x > LEVEL_MAX_X or y > LEVEL_MAX_Y:
+            return False
+        if [x, y] in level.walls:
+            return False
+        if [x, y] in [e.cur_pos for e in level.enemies]:
+            return False
+        if [x, y] == level.player.cur_pos:
+            return False
+        return True
 
     @abstractmethod
     def encode_for_client(self):
@@ -213,20 +221,6 @@ class PassiveEnemy(NPC):
         """
         return isinstance(opposing_char, Player)
 
-    def can_move(self, x, y, level):
-        """
-        Function for check next step
-        """
-        if x < 0 or y < 0 or x > 19 or y > 19:
-            return False
-        if [x, y] in level.walls:
-            return False
-        if [x, y] in [e.cur_pos for e in level.enemies]:
-            return False
-        if [x, y] == level.player.cur_pos:
-            return False
-        return True
-
     @property
     def health(self):
         return self._health
@@ -266,17 +260,6 @@ class AggressiveEnemy(NPC):
         if self.player_visible(level):
             return AggressiveMoveStrategy.get_next_move(self.cur_pos, level)
         return RandomMoveStrategy.get_next_move(self.cur_pos, level)
-
-    def can_move(self, x, y, level):
-        if x < 0 or y < 0 or x > 19 or y > 19:
-            return False
-        if [x, y] in level.walls:
-            return False
-        if [x, y] in [e.cur_pos for e in level.enemies]:
-            return False
-        if [x, y] == level.player.cur_pos:
-            return False
-        return True
 
     def should_attack(self, opposing_char):
         return isinstance(opposing_char, Player)
@@ -337,15 +320,6 @@ class Player(Character):
 
     def should_attack(self, opposing_char):
         return isinstance(opposing_char, AggressiveEnemy) or isinstance(opposing_char, PassiveEnemy)
-
-    def can_move(self, x, y, level):
-        if x < 0 or y < 0 or x > 19 or y > 19:
-            return False
-        if [x, y] in level.walls:
-            return False
-        if [x, y] in [e.cur_pos for e in level.enemies]:
-            return False
-        return True
 
     @health.setter
     def health(self, value):
