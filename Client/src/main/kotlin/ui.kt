@@ -15,7 +15,7 @@ fun TerminalScreen.drawMap(state: Map, curPlayer: String, curState: State) {
             "passive_enemy" -> TextCharacter.fromCharacter('P', TextColor.ANSI.BLUE, TextColor.ANSI.DEFAULT)[0]
             else -> throw RuntimeException("unknown enemy type")
         }
-        this.setCharacter(enemy.curPos[0], enemy.curPos[1], icon)
+        this.setCharacter(enemy.x, enemy.y, icon)
     }
     this.setCharacter(state.stairs[0], state.stairs[1], TextCharacter.fromCharacter('>')[0])
     var health = 0
@@ -32,7 +32,7 @@ fun TerminalScreen.drawMap(state: Map, curPlayer: String, curState: State) {
             }
             else -> TextCharacter.fromCharacter('@')[0]
         }
-        this.setCharacter(player.curPos[0], player.curPos[1], icon)
+        this.setCharacter(player.x, player.y, icon)
     }
     val healthGraphics = this.newTextGraphics()
     healthGraphics.drawLine(0, 20, 19, 20, Symbols.DOUBLE_LINE_HORIZONTAL)

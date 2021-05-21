@@ -11,7 +11,8 @@ import java.lang.RuntimeException
 @Serializable
 data class Character(val kind: String,
                      val health: Int,
-                     @SerialName("cur_pos") val curPos: List<Int>,
+                     val x: Int,
+                     val y: Int,
                      @SerialName("user_id") val userId: String? = null)
 
 @Serializable
