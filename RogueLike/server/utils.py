@@ -8,8 +8,7 @@ from server.mapGenerate import generate_map
 from server.characters import Player
 
 from server import models
-
-SIZE_OF_MAP = 19
+from server.constants import LEVEL_MAX_Y
 
 
 class Move(Enum):
@@ -79,7 +78,7 @@ def initialize_pos_new_player(session, user_id):
     for enemyObj in session.enemies:
         taken_poses.append(enemyObj.cur_pos)
 
-    for i in range(SIZE_OF_MAP):
+    for i in range(LEVEL_MAX_Y):
         if [0, i] in taken_poses:
             continue
         else:

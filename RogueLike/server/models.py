@@ -10,7 +10,6 @@ def get_fresh_default():
 def get_fresh_false():
     return False
 
-
 class Session(models.Model):
     map_id = models.CharField(max_length=100, default="")
     walls = models.JSONField(default=get_fresh_default)
