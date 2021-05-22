@@ -19,6 +19,8 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.6.0")
     implementation("io.ktor:ktor-client-core:1.5.3")
     implementation("io.ktor:ktor-client-cio:1.5.3")
+    implementation("io.ktor:ktor-server-core:1.5.3")
+    implementation("io.ktor:ktor-server-cio:1.5.3")
     implementation("com.googlecode.lanterna:lanterna:3.1.1")
     implementation("io.ktor:ktor-client-serialization:1.5.3")
 }
