@@ -152,3 +152,23 @@ def generate_coordinate(taken, is_start=False):
         y = random.randint(1, 19)
         is_start = False
     return x, y
+
+
+def check_position(pos):
+    """
+    Free position check
+    """
+    taken = get_taken()
+    return pos not in taken
+
+
+def get_taken():
+    """
+    Give all occupied positions
+    """
+    taken = []
+    session = models.Session.objects.get()
+    taken.extend(session.walls)
+    taken.extend(session.players)
+    taken.extend(session.enemies)
+    return taken
