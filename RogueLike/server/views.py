@@ -1,5 +1,4 @@
 import json
-import time
 import requests
 import threading
 from rest_framework.decorators import api_view
@@ -9,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from concurrent.futures import ThreadPoolExecutor
 
 from server import models
-from server.characters import AggressiveEnemy, Player, CharacterEncoder, PassiveEnemy
+from server.characters import Player, CharacterEncoder
 from server.mapGenerate import generate_map
 from server.utils import create_response_message, get_user_url, create_new_level_map, \
     initialize_pos_new_player, session_exists, random_string
@@ -36,11 +35,17 @@ class PlayerNotifier:
         self.tp.submit(self.notifiy_active_next)
 
     def get_user_num(self, id):
+        """
+        Function for getting user's number
+        """
         for i, u in enumerate(current_players):
             if u == id:
                 return i
 
     def notifiy_active_next(self):
+        """
+        Function that gives the user a certain amount of time to go
+        """
         while True:
             if len(current_players) == 0:
                 return
@@ -65,7 +70,6 @@ class PlayerNotifier:
                     for user_id_cur, ip_address in current_players.items():
                         requests.post(ip_address + '/state', params={'value': 'WAIT'})
                     continue
-
 
 
 notifier = PlayerNotifier()
@@ -191,6 +195,10 @@ def connect(request):
 
 @api_view(['POST'])
 def correct_disconnect(request):
+    """
+    If the user wants to quit the game. We save where it was saved,
+    but remove it from the current map.
+    """
     request_message = json.loads(request.body)
     user_id = request_message["user_id"]
     print("DISCONNECT: " + user_id)

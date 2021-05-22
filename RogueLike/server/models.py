@@ -10,7 +10,11 @@ def get_fresh_default():
 def get_fresh_false():
     return False
 
+
 class Session(models.Model):
+    """
+    Session has all information about all players, walls, stairs, enemies
+    """
     map_id = models.CharField(max_length=100, default="")
     walls = models.JSONField(default=get_fresh_default)
     stairs = models.JSONField(default=get_fresh_default)
@@ -34,8 +38,11 @@ class Session(models.Model):
         # Else char is enemy
         self.enemies.remove(char)
 
-# TODO: rename to session?
+
 class User(models.Model):
+    """
+    Remember all users(even if they are not playing now)
+    """
     user_id = models.CharField(max_length=100, default="")
     last_map = models.CharField(max_length=100, default="")
     player = models.JSONField(default=get_fresh_default, encoder=CharacterEncoder, decoder=CharacterDecoder)

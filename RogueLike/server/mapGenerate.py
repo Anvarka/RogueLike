@@ -1,9 +1,10 @@
 import random
 
-from server.characters import AggressiveEnemy, Player, CharacterEncoder, PassiveEnemy
+from server.characters import AggressiveEnemy, PassiveEnemy
 
 SIZE_OF_MAP = 19
 COUNT_OF_WALLS = 24
+
 
 def generate_map():
     """

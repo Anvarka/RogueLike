@@ -22,6 +22,9 @@ class Move(Enum):
 
 
 def random_string():
+    """
+    Random string for map_id
+    """
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=32))
 
 
@@ -59,13 +62,13 @@ def create_new_level_map(user_info):
     user_info.stairs = stairs
     user_info.enemies = enemies
     user_info.map_id = random_string()
+
     for (i, pl) in enumerate(user_info.players):
         pl.cur_pos = [0, i]
         player = models.User.objects.get(user_id=pl.user_id)
         player.player.cur_pos = pl.cur_pos
         player.last_map = user_info.map_id
         player.save()
-    
 
 
 def initialize_pos_new_player(session, user_id):
@@ -73,8 +76,10 @@ def initialize_pos_new_player(session, user_id):
     Function, which gives the position to the new user
     """
     taken_poses = []
+
     for playerObj in session.players:
         taken_poses.append(playerObj.cur_pos)
+
     for enemyObj in session.enemies:
         taken_poses.append(enemyObj.cur_pos)
 
@@ -85,6 +90,7 @@ def initialize_pos_new_player(session, user_id):
             player = Player(0, i, user_id)
             session.players.append(player)
             return player
+
 
 def session_exists():
     """
@@ -103,7 +109,26 @@ def is_user_new(user_id):
     """
     try:
         user_and_map = models.User.objects.get(user_id=user_id)
-        walls = user_and_map.walls
         return False
     except ObjectDoesNotExist:
         return True
+
+
+def check_position(pos):
+    """
+    Free position check
+    """
+    taken = get_taken()
+    return pos not in taken
+
+
+def get_taken():
+    """
+    Give all occupied positions
+    """
+    taken = []
+    session = models.Session.objects.get()
+    taken.extend(session.walls)
+    taken.extend(session.players)
+    taken.extend(session.enemies)
+    return taken
