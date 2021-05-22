@@ -1,58 +1,29 @@
 import random
 from abc import ABC, abstractmethod
 from typing import Any
+from server.constants import LEVEL_MIN_X, LEVEL_MIN_Y, LEVEL_MAX_X, LEVEL_MAX_Y
 import json
 
 
-def plot_line_low(x0, y0, x1, y1):
-    dx = x1 - x0
-    dy = y1 - y0
-    yi = 1
-    if dy < 0:
-        yi = -1
-        dy = -dy
-    d = (2 * dy) - dx
-    y = y0
-    line = []
-    for x in range(x0, x1 + 1):
-        line.append([x, y])
-        if d > 0:
-            y = y + yi
-            d = d + (2 * (dy - dx))
-        else:
-            d = d + 2 * dy
-    return line
-
-
-def plot_line_high(x0, y0, x1, y1):
-    dx = x1 - x0
-    dy = y1 - y0
-    xi = 1
-    if dx < 0:
-        xi = -1
-        dx = -dx
-    D = (2 * dx) - dy
-    x = x0
-    line = []
-    for y in range(y0, y1 + 1):
-        line.append([x, y])
-        if D > 0:
-            x = x + xi
-            D = D + (2 * (dx - dy))
-        else:
-            D = D + 2 * dx
-    return line
-
-
 def plot_line(x0, y0, x1, y1):
-    """Helper function that returns cells in line from (x0, y0) to (x1, y1)"""
-    if abs(y1 - y0) < abs(x1 - x0):
-        if x0 > x1:
-            return plot_line_low(x1, y1, x0, y0)
-        return plot_line_low(x0, y0, x1, y1)
-    if y0 > y1:
-        return plot_line_high(x1, y1, x0, y0)
-    return plot_line_high(x0, y0, x1, y1)
+    line = []
+    dx =  abs(x1 - x0)
+    sx = 1 if x0 < x1 else -1
+    dy = -abs(y1 - y0)
+    sy = 1 if y0 < y1 else - 1
+    err = dx + dy  # error value e_xy
+    while True:
+        line.append([x0, y0])
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy: # e_xy+e_x > 0
+            err += dy
+            x0 += sx
+        if e2 <= dx:  # e_xy+e_y < 0
+            err += dx
+            y0 += sy
+    return line
 
 
 class MoveStrategy(ABC):
@@ -136,9 +107,16 @@ class Character(ABC):
     def should_attack(self, opposing_char):
         pass
 
-    @abstractmethod
     def can_move(self, x, y, level):
-        pass
+        if x < LEVEL_MIN_X or y < LEVEL_MIN_Y or x > LEVEL_MAX_X or y > LEVEL_MAX_Y:
+            return False
+        if [x, y] in level.walls:
+            return False
+        if [x, y] in [e.cur_pos for e in level.enemies]:
+            return False
+        if [x, y] == level.player.cur_pos:
+            return False
+        return True
 
     @abstractmethod
     def encode_for_client(self):
@@ -213,20 +191,6 @@ class PassiveEnemy(NPC):
         """
         return isinstance(opposing_char, Player)
 
-    def can_move(self, x, y, level):
-        """
-        Function for check next step
-        """
-        if x < 0 or y < 0 or x > 19 or y > 19:
-            return False
-        if [x, y] in level.walls:
-            return False
-        if [x, y] in [e.cur_pos for e in level.enemies]:
-            return False
-        if [x, y] == level.player.cur_pos:
-            return False
-        return True
-
     @property
     def health(self):
         return self._health
@@ -266,17 +230,6 @@ class AggressiveEnemy(NPC):
         if self.player_visible(level):
             return AggressiveMoveStrategy.get_next_move(self.cur_pos, level)
         return RandomMoveStrategy.get_next_move(self.cur_pos, level)
-
-    def can_move(self, x, y, level):
-        if x < 0 or y < 0 or x > 19 or y > 19:
-            return False
-        if [x, y] in level.walls:
-            return False
-        if [x, y] in [e.cur_pos for e in level.enemies]:
-            return False
-        if [x, y] == level.player.cur_pos:
-            return False
-        return True
 
     def should_attack(self, opposing_char):
         return isinstance(opposing_char, Player)
@@ -338,15 +291,6 @@ class Player(Character):
     def should_attack(self, opposing_char):
         return isinstance(opposing_char, AggressiveEnemy) or isinstance(opposing_char, PassiveEnemy)
 
-    def can_move(self, x, y, level):
-        if x < 0 or y < 0 or x > 19 or y > 19:
-            return False
-        if [x, y] in level.walls:
-            return False
-        if [x, y] in [e.cur_pos for e in level.enemies]:
-            return False
-        return True
-
     @health.setter
     def health(self, value):
         self._health = value
@@ -365,12 +309,15 @@ class Player(Character):
 
 class CharacterEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
-        if isinstance(o, AggressiveEnemy):
-            return {'kind': 'agr_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
-        if isinstance(o, PassiveEnemy):
-            return {'kind': 'passive_enemy', 'cur_pos': o.cur_pos, 'health': o.health}
-        if isinstance(o, Player):
-            return {'kind': 'player', 'cur_pos': o.cur_pos, 'health': o.health}
+        if isinstance(o, Character):
+            encoded = {'x': o.x, 'y': o.y, 'health': o.health}
+            if isinstance(o, AggressiveEnemy):
+                encoded['kind'] = 'agr_enemy'
+            elif isinstance(o, PassiveEnemy):
+                encoded['kind'] = 'passive_enemy'
+            else:
+                encoded['kind'] = 'player'
+            return encoded
         return super().default(o)
 
 
@@ -381,9 +328,9 @@ class CharacterDecoder(json.JSONDecoder):
     @staticmethod
     def object_hook(obj):
         if (ch_type := obj.get('kind', '')) == 'agr_enemy':
-            return AggressiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return AggressiveEnemy(obj['x'], obj['y'], obj['health'])
         elif (ch_type := obj.get('kind', '')) == 'passive_enemy':
-            return PassiveEnemy(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return PassiveEnemy(obj['x'], obj['y'], obj['health'])
         elif ch_type == 'player':
-            return Player(obj['cur_pos'][0], obj['cur_pos'][1], obj['health'])
+            return Player(obj['x'], obj['y'], obj['health'])
         return obj
