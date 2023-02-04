@@ -1,13 +1,13 @@
 """
-Please, turn on 1) the server + 2) client "was"
+Please, turn on 1) the server + 2) client "was" + 3) client "user"(for test_multiplayer)
 for the tests to work correctly
 """
 import json
 
 from django.test import TestCase, Client
 from server import models
-from server.views import generate_map
-from server.views import is_user_new, check_position
+from server.mapGenerate import generate_map
+from server.utils import is_user_new, check_position
 
 URL = "http://127.0.0.1:8000/server/"
 CONNECT = "connect/"
@@ -70,6 +70,34 @@ class RogueLikeTestCase(TestCase):
 
         user_info = models.User.objects.get(user_id="was")
         correct_pos = [1, 0] if check_position([1, 0]) else [0, 0]
+        self.assertEqual(user_info.player.cur_pos, correct_pos)
+
+    def test_multiplayers(self):
+        """
+        Function for testing of multiplayer's properties
+        """
+        self.connection(user_id="was")
+        self.connection(user_id="user")
+
+        content_info = self.post_to_map(user_id="was")
+        data = json.loads(content_info)
+        self.assertEqual(len(data["players"]), 2)
+
+        self.assertEqual([data["players"][0]["x"], data["players"][0]["y"]], [0, 0])
+        self.assertEqual([data["players"][1]["x"], data["players"][1]["y"]], [0, 1])
+
+        self.make_move("was", direction="right")
+        self.connection("was", disconnect=True)
+
+        self.make_move("user", direction="right")
+        self.connection("user", disconnect=True)
+
+        user_info = models.User.objects.get(user_id="was")
+        correct_pos = [1, 0] if check_position([1, 0]) else [0, 0]
+        self.assertEqual(user_info.player.cur_pos, correct_pos)
+
+        user_info = models.User.objects.get(user_id="user")
+        correct_pos = [1, 1] if check_position([1, 1]) else [0, 1]
         self.assertEqual(user_info.player.cur_pos, correct_pos)
 
     def connection(self, user_id, disconnect=False):
